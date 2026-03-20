@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #080808;
+  color: #f0f0f0;
+  font-family: Georgia, serif;
+  min-height: 100vh;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.hov-card { transition: transform 0.2s; }
+.hov-card:hover { transform: translateY(-3px); }
+
+.hov-chip {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  color: #555;
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.hov-chip:hover {
+  border-color: rgba(240,192,48,0.5);
+  color: #f0c030;
+  background: rgba(240,192,48,0.06);
+}
+
+.buy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 11px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.buy-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+input::placeholder { color: #333; }
+
+.skel {
+  background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8px;
+}
