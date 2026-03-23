@@ -4,20 +4,32 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req) {
   try {
-    const { query } = await req.json();
+    const { query, pincode, city } = await req.json();
 
     if (!query || query.trim().length === 0) {
       return Response.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const prompt = `You are a helpful price estimation assistant for Indian grocery shopping. Based on your training knowledge, give typical approximate prices for "${query.trim()}" on Blinkit, Zepto, Swiggy Instamart, and BigBasket in India.
+    const locationContext = pincode
+      ? `The user is in ${city ? city + ", " : ""}India with pincode ${pincode}.`
+      : "The user is somewhere in India (location not shared).";
 
-These are rough ballpark estimates to help users know which app is likely cheaper before they check. Users understand prices change and will verify on the app.
+    const prompt = `You are a price comparison assistant for Indian quick-commerce apps. ${locationContext}
 
-Respond with ONLY a raw JSON object, no markdown, no text before or after:
-{"blinkit":{"price":249,"item":"exact product name and size","available":true},"zepto":{"price":245,"item":"exact product name and size","available":true},"swiggy":{"price":252,"item":"exact product name and size","available":true},"bigbasket":{"price":240,"item":"exact product name and size","available":true}}
+Give realistic approximate prices for "${query.trim()}" on Blinkit, Zepto, Swiggy Instamart, and BigBasket.
 
-Rules: price must be an integer (no currency symbol). If a product is unlikely to be on a platform set available:false and price:0. Return ONLY the JSON.`;
+CRITICAL RULES:
+- Prices MUST vary across platforms — they compete differently on different products
+- Do NOT always pick the same platform as cheapest — it genuinely varies by product category
+- For groceries: BigBasket and Blinkit often compete closely. Zepto sometimes cheaper on snacks
+- For personal care: Blinkit and Zepto often match. BigBasket sometimes pricier
+- For fresh produce: prices vary a lot by location and season — reflect that uncertainty
+- This works for ANY product sold on these apps — groceries, snacks, personal care, medicines, baby products, pet food, etc.
+- If a product is genuinely not sold on a platform, set available:false and price:0
+- Prices should be realistic Indian rupee amounts
+
+Respond ONLY with raw JSON, no markdown, no extra text:
+{"blinkit":{"price":249,"item":"exact product name and size","available":true},"zepto":{"price":239,"item":"exact product name and size","available":true},"swiggy":{"price":255,"item":"exact product name and size","available":true},"bigbasket":{"price":245,"item":"exact product name and size","available":true}}`;
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-5",
@@ -25,12 +37,8 @@ Rules: price must be an integer (no currency symbol). If a product is unlikely t
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    const text = message.content.filter(b => b.type === "text").map(b => b.text).join("");
 
-    // Parse JSON robustly
     let parsed = null;
     try { parsed = JSON.parse(text.trim()); } catch {}
     if (!parsed) {
@@ -39,14 +47,10 @@ Rules: price must be an integer (no currency symbol). If a product is unlikely t
     }
     if (!parsed) {
       const s = text.indexOf("{"), e = text.lastIndexOf("}");
-      if (s !== -1 && e > s) {
-        try { parsed = JSON.parse(text.slice(s, e + 1)); } catch {}
-      }
+      if (s !== -1 && e > s) { try { parsed = JSON.parse(text.slice(s, e + 1)); } catch {} }
     }
 
-    if (!parsed) {
-      return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
-    }
+    if (!parsed) return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
 
     return Response.json({ results: parsed });
   } catch (err) {
