@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #080808;
-  color: #f0f0f0;
-  font-family: Georgia, serif;
+  background: #f7f5f0;
+  color: #1a1a1a;
+  font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
 }
 
@@ -23,23 +23,24 @@ body {
   to { transform: rotate(360deg); }
 }
 
-.hov-card { transition: transform 0.2s; }
-.hov-card:hover { transform: translateY(-3px); }
+.hov-card { transition: transform 0.2s, box-shadow 0.2s; }
+.hov-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.1); }
 
 .hov-chip {
-  background: #111;
-  border: 1px solid #1e1e1e;
-  color: #555;
+  background: #fff;
+  border: 1px solid #e5e0d8;
+  color: #888;
   font-size: 12px;
   padding: 5px 14px;
   border-radius: 100px;
   cursor: pointer;
   transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
 }
 .hov-chip:hover {
-  border-color: rgba(240,192,48,0.5);
-  color: #f0c030;
-  background: rgba(240,192,48,0.06);
+  border-color: #e8a020;
+  color: #c47f00;
+  background: #fffbf0;
 }
 
 .buy-btn {
@@ -55,13 +56,14 @@ body {
   width: 100%;
   box-sizing: border-box;
   transition: opacity 0.15s, transform 0.15s;
+  font-family: 'DM Sans', sans-serif;
 }
-.buy-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.buy-btn:hover { opacity: 0.88; transform: translateY(-1px); }
 
-input::placeholder { color: #333; }
+input::placeholder { color: #bbb; }
 
 .skel {
-  background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+  background: linear-gradient(90deg, #ede9e0 25%, #f5f2ec 50%, #ede9e0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-radius: 8px;
