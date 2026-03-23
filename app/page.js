@@ -2,16 +2,16 @@
 import { useState, useEffect } from "react";
 
 const PLATFORMS = [
-  { key: "blinkit",   name: "Blinkit",         tag: "10-min delivery",  emoji: "⚡", color: "#f9d53e", url: q => `https://blinkit.com/s/?q=${encodeURIComponent(q)}` },
-  { key: "zepto",     name: "Zepto",            tag: "Fastest delivery", emoji: "🟣", color: "#b06ef3", url: q => `https://www.zeptonow.com/search?query=${encodeURIComponent(q)}` },
-  { key: "swiggy",    name: "Swiggy Instamart", tag: "Wide selection",   emoji: "🧡", color: "#fc8019", url: q => `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(q)}` },
-  { key: "bigbasket", name: "BigBasket",        tag: "Best variety",     emoji: "🛒", color: "#84c225", url: q => `https://www.bigbasket.com/ps/?q=${encodeURIComponent(q)}` },
+  { key: "blinkit",   name: "Blinkit",         tag: "10-min delivery",  emoji: "⚡", color: "#f9d53e", url: (q, p) => `https://blinkit.com/s/?q=${encodeURIComponent(q)}` },
+  { key: "zepto",     name: "Zepto",            tag: "Fastest delivery", emoji: "🟣", color: "#b06ef3", url: (q, p) => `https://www.zeptonow.com/search?query=${encodeURIComponent(q)}` },
+  { key: "swiggy",    name: "Swiggy Instamart", tag: "Wide selection",   emoji: "🧡", color: "#fc8019", url: (q, p) => `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(q)}` },
+  { key: "bigbasket", name: "BigBasket",        tag: "Best variety",     emoji: "🛒", color: "#84c225", url: (q, p) => `https://www.bigbasket.com/ps/?q=${encodeURIComponent(q)}` },
 ];
 
 const QUICK = [
   "Amul Butter 500g", "Maggi Noodles 560g", "Tata Salt 1kg",
   "Dove Soap 100g", "Aashirvaad Atta 5kg", "Colgate MaxFresh 150g",
-  "Lays Classic Salted 26g", "Britannia Good Day 600g",
+  "Dettol Hand Wash 200ml", "Pampers Small 20 count",
 ];
 
 function PriceBar({ results, cheapestKey }) {
@@ -21,10 +21,11 @@ function PriceBar({ results, cheapestKey }) {
   return (
     <div style={{ marginTop: 28, padding: "20px 24px", background: "#0f0f0f", borderRadius: 16, border: "1px solid #1e1e1e" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color: "#333", fontFamily: "'DM Mono',monospace" }}>Estimated Price Comparison</div>
-        <div style={{ fontSize: 10, color: "#e05555", fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e05555", display: "inline-block" }} />
-          Click any card to verify real price on app
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color: "#333", fontFamily: "'DM Mono',monospace" }}>
+          Estimated Price Comparison
+        </div>
+        <div style={{ fontSize: 10, color: "#888", fontFamily: "'DM Mono',monospace" }}>
+          Click "See Real Price" to verify on each app
         </div>
       </div>
       {PLATFORMS.map(p => {
@@ -55,11 +56,48 @@ export default function Home() {
   const [curQuery, setCurQuery] = useState("");
   const [tick, setTick] = useState(0);
 
+  // Location state
+  const [pincode, setPincode] = useState("");
+  const [city, setCity] = useState("");
+  const [locationStatus, setLocationStatus] = useState("idle"); // idle | detecting | found | denied
+
   useEffect(() => {
     if (uiState !== "loading") return;
     const id = setInterval(() => setTick(t => t + 1), 700);
     return () => clearInterval(id);
   }, [uiState]);
+
+  // Auto-detect location on load
+  useEffect(() => {
+    detectLocation();
+  }, []);
+
+  async function detectLocation() {
+    if (!navigator.geolocation) return;
+    setLocationStatus("detecting");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          // Use OpenStreetMap free reverse geocoding — no API key needed
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const geo = await res.json();
+          const detectedPincode = geo?.address?.postcode || "";
+          const detectedCity = geo?.address?.city || geo?.address?.town || geo?.address?.suburb || "";
+          setPincode(detectedPincode);
+          setCity(detectedCity);
+          setLocationStatus("found");
+        } catch {
+          setLocationStatus("denied");
+        }
+      },
+      () => setLocationStatus("denied"),
+      { timeout: 8000 }
+    );
+  }
 
   const steps = ["Checking Blinkit…", "Checking Zepto…", "Checking Swiggy…", "Checking BigBasket…", "Comparing prices…"];
 
@@ -73,7 +111,7 @@ export default function Home() {
       const res = await fetch("/api/prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: sq }),
+        body: JSON.stringify({ query: sq, pincode, city }),
       });
 
       const json = await res.json();
@@ -106,33 +144,61 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#f0f0f0", fontFamily: "Georgia, serif" }}>
-      {/* BG grid */}
       <div style={{ position: "fixed", inset: 0, backgroundImage: "linear-gradient(rgba(240,192,48,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(240,192,48,0.02) 1px,transparent 1px)", backgroundSize: "60px 60px", pointerEvents: "none", zIndex: 0 }} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", padding: "48px 32px 72px" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 40, animation: "fadeUp .45s ease both" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, animation: "fadeUp .45s ease both" }}>
           <div>
-            <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "#f0c030", marginBottom: 14, fontFamily: "'DM Mono',monospace" }}>⚡ India Grocery Price Guide</div>
+            <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "#f0c030", marginBottom: 14, fontFamily: "'DM Mono',monospace" }}>
+              ⚡ India Price Guide — Any Product
+            </div>
             <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: "clamp(2.4rem,3.5vw,3.8rem)", fontWeight: 900, lineHeight: 1.0, letterSpacing: "-0.02em" }}>
               Find the <em style={{ color: "#f0c030" }}>cheapest</em><br />price. Instantly.
             </h1>
           </div>
-          <div style={{ display: "flex", gap: 8, paddingTop: 6 }}>
-            {PLATFORMS.map(p => (
-              <div key={p.key} title={p.name} style={{ width: 40, height: 40, borderRadius: 11, background: "#111", border: "1px solid #1e1e1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                {p.emoji}
-              </div>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              {PLATFORMS.map(p => (
+                <div key={p.key} title={p.name} style={{ width: 40, height: 40, borderRadius: 11, background: "#111", border: "1px solid #1e1e1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                  {p.emoji}
+                </div>
+              ))}
+            </div>
+
+            {/* Location pill */}
+            <div
+              onClick={() => locationStatus === "denied" || locationStatus === "idle" ? detectLocation() : null}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: locationStatus === "found" ? "rgba(52,211,153,0.08)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${locationStatus === "found" ? "rgba(52,211,153,0.3)" : "#2a2a2a"}`,
+                borderRadius: 100, padding: "6px 14px",
+                cursor: locationStatus === "denied" || locationStatus === "idle" ? "pointer" : "default",
+                fontSize: 12, fontFamily: "'DM Mono',monospace",
+              }}>
+              <span>{locationStatus === "found" ? "📍" : locationStatus === "detecting" ? "🔄" : "📍"}</span>
+              <span style={{ color: locationStatus === "found" ? "#34d399" : "#555" }}>
+                {locationStatus === "found"
+                  ? `${city ? city + " · " : ""}${pincode}`
+                  : locationStatus === "detecting"
+                  ? "Detecting location…"
+                  : "Click to detect location"}
+              </span>
+              {locationStatus === "found" && (
+                <span style={{ color: "#2a6650", fontSize: 10 }}>· prices adjusted</span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Warning banner */}
-        <div style={{ background: "rgba(224,85,85,0.06)", border: "1px solid rgba(224,85,85,0.2)", borderRadius: 12, padding: "10px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, animation: "fadeUp .45s .05s ease both" }}>
+        <div style={{ background: "rgba(224,85,85,0.05)", border: "1px solid rgba(224,85,85,0.15)", borderRadius: 12, padding: "10px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, animation: "fadeUp .45s .05s ease both" }}>
           <span>⚠️</span>
-          <span style={{ fontSize: 12, color: "#c0392b", fontFamily: "'DM Mono',monospace" }}>
-            Prices shown are <strong>AI estimates</strong> from training data and may be outdated. Always click <strong>"See Real Price"</strong> to verify on the app before buying.
+          <span style={{ fontSize: 12, color: "#a04040", fontFamily: "'DM Mono',monospace" }}>
+            Prices are <strong>AI estimates</strong> and may be outdated. Always click <strong>"See Real Price"</strong> to verify before buying.
+            {pincode && <span style={{ color: "#34d399" }}> · Showing estimates for {pincode}.</span>}
           </span>
         </div>
 
@@ -144,7 +210,7 @@ export default function Home() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && search()}
-              placeholder="Search any grocery — Amul Butter, Maggi, Tata Salt, Dove Soap…"
+              placeholder="Search anything — groceries, snacks, medicines, personal care, baby products…"
               style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f0f0f0", fontSize: 17, fontFamily: "inherit" }}
             />
             <button onClick={() => search()} disabled={uiState === "loading"}
@@ -164,8 +230,11 @@ export default function Home() {
         {uiState === "idle" && (
           <div style={{ textAlign: "center", padding: "72px 20px", animation: "fadeUp .4s ease both" }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>🛒</div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, color: "#222", marginBottom: 10 }}>Ready to compare</div>
-            <div style={{ color: "#333", fontSize: 14 }}>Get ballpark estimates across Blinkit, Zepto, Swiggy & BigBasket — then click to verify the real price</div>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, color: "#222", marginBottom: 10 }}>Search any product</div>
+            <div style={{ color: "#333", fontSize: 14 }}>
+              Groceries, snacks, medicines, personal care, baby products — anything sold on quick-commerce apps
+              {pincode && <div style={{ color: "#34d399", marginTop: 8, fontSize: 13 }}>📍 Location detected: {city} {pincode} · prices will reflect your area</div>}
+            </div>
           </div>
         )}
 
@@ -210,7 +279,9 @@ export default function Home() {
           <div style={{ animation: "fadeUp .35s ease both" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
               <div>
-                <div style={{ fontSize: 10, color: "#333", fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 5 }}>Estimated prices for</div>
+                <div style={{ fontSize: 10, color: "#333", fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 5 }}>
+                  Estimated prices for {pincode && <span style={{ color: "#34d399" }}>· 📍 {pincode}</span>}
+                </div>
                 <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 700, color: "#f0c030", fontStyle: "italic" }}>"{curQuery}"</div>
               </div>
               {data.cheapest && data.savings > 0 && (
@@ -265,21 +336,25 @@ export default function Home() {
                     </div>
 
                     <div style={{ fontSize: 12, color: "#444", marginBottom: 20, lineHeight: 1.5, minHeight: 36, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                      {r.item || "Not available on this platform"}
+                      {r.item || "Not typically available here"}
                     </div>
 
-                    <a href={p.url(curQuery)} target="_blank" rel="noopener noreferrer" className="buy-btn"
+                    <a href={p.url(curQuery, pincode)} target="_blank" rel="noopener noreferrer" className="buy-btn"
                       style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                         background: isCheapest ? "#34d399" : "rgba(255,255,255,0.05)",
                         border: `1px solid ${isCheapest ? "#34d399" : "#2a2a2a"}`,
                         color: isCheapest ? "#000" : "#888",
+                        borderRadius: 11, padding: "12px 16px", fontSize: 13, fontWeight: 700,
+                        textDecoration: "none", width: "100%", boxSizing: "border-box",
+                        transition: "opacity .15s, transform .15s",
                       }}>
                       {r.available ? "See Real Price ↗" : "Search ↗"}
                     </a>
 
                     {r.available && (
                       <div style={{ textAlign: "center", fontSize: 10, color: "#2a2a2a", marginTop: 8, fontFamily: "'DM Mono',monospace" }}>
-                        tap to verify on {p.name}
+                        verify on {p.name}
                       </div>
                     )}
                   </div>
@@ -290,7 +365,7 @@ export default function Home() {
             <PriceBar results={data.results} cheapestKey={data.cheapest} />
 
             <div style={{ marginTop: 20, textAlign: "center", fontSize: 11, color: "#222", fontFamily: "'DM Mono',monospace", letterSpacing: "0.06em", lineHeight: 1.8 }}>
-              AI ESTIMATES FROM TRAINING DATA · PRICES CHANGE DAILY · ALWAYS VERIFY ON APP BEFORE BUYING
+              AI ESTIMATES · PRICES CHANGE DAILY · ALWAYS VERIFY ON APP BEFORE BUYING
             </div>
           </div>
         )}
